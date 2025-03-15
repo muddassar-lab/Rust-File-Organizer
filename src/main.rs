@@ -1,12 +1,19 @@
 use colored::*;
+use dialoguer::{Select, theme::ColorfulTheme};
 use file_organizer::{
+    OrganizeError,
+    models::SaveState,
     organizer::{get_all_files, organize_files},
     ui::{
         cleanup, create_progress_bars, get_output_choice, get_output_location,
         update_file_progress, update_total_progress,
     },
 };
-use std::process;
+use std::{
+    process,
+    sync::Arc,
+    sync::atomic::{AtomicBool, Ordering},
+};
 
 fn print_header() {
     println!("{}", "\n🚀 File Organizer v1.0".bright_blue().bold());
@@ -21,8 +28,31 @@ fn handle_error(error: impl std::fmt::Display, output_path: Option<&std::path::P
     process::exit(1);
 }
 
+fn save_progress(save_state: SaveState) -> Result<(), OrganizeError> {
+    let save_path = save_state.output_path.with_extension("forg");
+    save_state
+        .save_to_file(&save_path)
+        .map_err(|e| OrganizeError::FileCopyFailed(format!("Failed to save progress: {}", e)))?;
+
+    println!(
+        "\n{} {}",
+        "📝 Progress saved at:".bright_yellow(),
+        save_path.display()
+    );
+    Ok(())
+}
+
 fn main() {
     print_header();
+
+    let stop_signal = Arc::new(AtomicBool::new(false));
+    let stop_signal_clone = stop_signal.clone();
+
+    // Set up Ctrl+C handler
+    ctrlc::set_handler(move || {
+        stop_signal_clone.store(true, Ordering::Relaxed);
+    })
+    .expect("Error setting Ctrl+C handler");
 
     // Get input and output paths
     let input_path = get_output_location()
@@ -61,10 +91,11 @@ fn main() {
 
     // Process files
     println!("\n{}", "📊 Organizing files...".bright_cyan());
+    println!("Press Ctrl+C to stop the process");
+
     let (multi, total_progress, file_progress) = create_progress_bars();
     let total_files = files.len() as u64;
 
-    // Add progress bars to multi
     let total_progress = multi.add(total_progress);
     let file_progress = multi.add(file_progress);
 
@@ -72,6 +103,7 @@ fn main() {
         let total_progress = total_progress.clone();
         let file_progress = file_progress.clone();
         let output_path = output_path.clone();
+        let stop_signal = stop_signal.clone();
         move || {
             organize_files(
                 files,
@@ -80,19 +112,42 @@ fn main() {
                     update_total_progress(&total_progress, total_files, current_file as u64);
                     update_file_progress(&file_progress, file_name, file_size, bytes_copied);
                 },
+                stop_signal,
             )
         }
     })
     .join()
     .unwrap();
 
-    // Clear progress bars when done
     total_progress.finish_and_clear();
     file_progress.finish_and_clear();
 
-    // Handle result
     match result {
-        Ok(_) => {
+        Ok(Some(save_state)) => {
+            println!("\n{}", "🛑 Process interrupted!".yellow());
+
+            let options = vec!["Save progress and exit", "Just exit"];
+            let selection = Select::with_theme(&ColorfulTheme::default())
+                .with_prompt("What would you like to do?")
+                .items(&options)
+                .default(0)
+                .interact()
+                .unwrap_or(1);
+
+            match selection {
+                0 => {
+                    if let Err(e) = save_progress(save_state) {
+                        handle_error(e, Some(&output_path));
+                    }
+                    println!("\n{}", "👋 Goodbye!".bright_blue());
+                }
+                _ => {
+                    cleanup(&output_path);
+                    println!("\n{}", "👋 Goodbye!".bright_blue());
+                }
+            }
+        }
+        Ok(None) => {
             println!(
                 "\n{}",
                 "✨ Organization completed successfully!"
