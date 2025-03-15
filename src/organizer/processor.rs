@@ -26,7 +26,8 @@ where
     );
 
     for (index, file) in files.into_iter().enumerate() {
-        if stop_signal.load(Ordering::Relaxed) {
+        // Check stop signal before starting a new file
+        if stop_signal.load(Ordering::SeqCst) && index > 0 {
             return Ok(Some(save_state));
         }
 
@@ -54,7 +55,6 @@ where
             },
         )?;
 
-        // Add to save state after successful copy
         save_state.add_processed_file(
             file.path.clone(),
             file.name.clone(),
@@ -65,14 +65,14 @@ where
         );
     }
 
-    Ok(None) // None means all files were processed successfully
+    Ok(None)
 }
 
 fn copy_file_with_progress<F>(
     source: &PathBuf,
     target: &PathBuf,
-    file_name: &str,
-    file_size: u64,
+    _file_name: &str,
+    _file_size: u64,
     mut progress_callback: F,
 ) -> Result<(), OrganizeError>
 where

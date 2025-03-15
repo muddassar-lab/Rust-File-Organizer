@@ -54,4 +54,20 @@ impl SaveState {
 
         Ok(save_path)
     }
+
+    pub fn load(save_path: &PathBuf) -> io::Result<Self> {
+        let content = fs::read_to_string(save_path)?;
+        serde_json::from_str(&content).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
+    }
+
+    pub fn list_saves() -> io::Result<Vec<PathBuf>> {
+        let save_dir = get_save_dir();
+        let entries = fs::read_dir(save_dir)?;
+
+        Ok(entries
+            .filter_map(|entry| entry.ok())
+            .map(|entry| entry.path())
+            .filter(|path| path.extension().and_then(|ext| ext.to_str()) == Some("forg"))
+            .collect())
+    }
 }
