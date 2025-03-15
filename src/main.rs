@@ -29,9 +29,8 @@ fn handle_error(error: impl std::fmt::Display, output_path: Option<&std::path::P
 }
 
 fn save_progress(save_state: SaveState) -> Result<(), OrganizeError> {
-    let save_path = save_state.output_path.with_extension("forg");
-    save_state
-        .save_to_file(&save_path)
+    let save_path = save_state
+        .save()
         .map_err(|e| OrganizeError::FileCopyFailed(format!("Failed to save progress: {}", e)))?;
 
     println!(

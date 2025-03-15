@@ -1,3 +1,4 @@
+use crate::utils::{ensure_save_dir, generate_save_filename, get_save_dir};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::{fs, io};
@@ -26,7 +27,13 @@ impl SaveState {
         }
     }
 
-    pub fn add_processed_file(&mut self, path: PathBuf, name: String, size: u64, modified: std::time::SystemTime) {
+    pub fn add_processed_file(
+        &mut self,
+        path: PathBuf,
+        name: String,
+        size: u64,
+        modified: std::time::SystemTime,
+    ) {
         self.processed_files.push(ProcessedFile {
             path,
             name,
@@ -35,9 +42,16 @@ impl SaveState {
         });
     }
 
-    pub fn save_to_file(&self, file_path: &PathBuf) -> io::Result<()> {
+    pub fn save(&self) -> io::Result<PathBuf> {
+        ensure_save_dir()?;
+
+        let save_dir = get_save_dir();
+        let filename = generate_save_filename(&self.input_path);
+        let save_path = save_dir.join(filename);
+
         let json = serde_json::to_string_pretty(self)?;
-        fs::write(file_path, json)?;
-        Ok(())
+        fs::write(&save_path, json)?;
+
+        Ok(save_path)
     }
 }
