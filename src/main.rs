@@ -1,7 +1,10 @@
 use colored::*;
 use file_organizer::{
     organizer::{get_all_files, organize_files},
-    ui::{cleanup, create_progress_bars, get_output_choice, get_output_location, update_progress},
+    ui::{
+        cleanup, create_progress_bars, get_output_choice, get_output_location,
+        update_file_progress, update_total_progress,
+    },
 };
 use std::process;
 
@@ -58,20 +61,34 @@ fn main() {
 
     // Process files
     println!("\n{}", "📊 Organizing files...".bright_cyan());
-    let (_, progress_bar) = create_progress_bars();
+    let (multi, total_progress, file_progress) = create_progress_bars();
     let total_files = files.len() as u64;
 
+    // Add progress bars to multi
+    let total_progress = multi.add(total_progress);
+    let file_progress = multi.add(file_progress);
+
     let result = std::thread::spawn({
-        let progress_bar = progress_bar.clone();
+        let total_progress = total_progress.clone();
+        let file_progress = file_progress.clone();
         let output_path = output_path.clone();
         move || {
-            organize_files(files, &output_path, |current| {
-                update_progress(&progress_bar, total_files, current as u64);
-            })
+            organize_files(
+                files,
+                &output_path,
+                |file_name, file_size, bytes_copied, current_file| {
+                    update_total_progress(&total_progress, total_files, current_file as u64);
+                    update_file_progress(&file_progress, file_name, file_size, bytes_copied);
+                },
+            )
         }
     })
     .join()
     .unwrap();
+
+    // Clear progress bars when done
+    total_progress.finish_and_clear();
+    file_progress.finish_and_clear();
 
     // Handle result
     match result {
