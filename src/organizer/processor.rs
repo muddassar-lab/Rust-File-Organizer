@@ -26,10 +26,12 @@ where
     );
 
     for (index, file) in files.into_iter().enumerate() {
-        // Check stop signal before starting a new file
         if stop_signal.load(Ordering::SeqCst) && index > 0 {
             return Ok(Some(save_state));
         }
+
+        let file_size = file.meta.len();
+        let mut processed = 0;
 
         let file_type = file.get_type();
         let date = file
@@ -55,13 +57,17 @@ where
             },
         )?;
 
+        // Call progress callback with final state (100% complete)
+        progress_callback(&file.name, file_size, file_size, index);
+
+        // Add to save state
         save_state.add_processed_file(
-            file.path.clone(),
-            file.name.clone(),
-            file.meta.len(),
+            file.path,
+            file.name,
+            file_size,
             file.meta
                 .modified()
-                .map_err(|e| OrganizeError::UserInputError(e.to_string()))?,
+                .unwrap_or_else(|_| std::time::SystemTime::now()),
         );
     }
 
@@ -71,8 +77,8 @@ where
 fn copy_file_with_progress<F>(
     source: &PathBuf,
     target: &PathBuf,
-    _file_name: &str,
-    _file_size: u64,
+    file_name: &str,
+    file_size: u64,
     mut progress_callback: F,
 ) -> Result<(), OrganizeError>
 where
@@ -92,6 +98,8 @@ where
             .map_err(|e| OrganizeError::FileCopyFailed(e.to_string()))?;
 
         if bytes_read == 0 {
+            // Make sure to call progress one last time with total size
+            progress_callback(file_size);
             break;
         }
 

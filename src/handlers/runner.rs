@@ -1,19 +1,20 @@
-use colored::*;
-use std::sync::{atomic::{AtomicBool, Ordering}, Arc};
 use crate::{
     cli::{handle_error, print_header, select_operation_mode},
     handlers::{InitResult, handle_organization_result, initialize_app, spawn_processing_thread},
-    ui::{create_progress_bars, update_total_progress},
+    ui::progress::ProgressUI,
+};
+use colored::*;
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
 };
 
 pub fn run_app() {
     print_header();
 
-    // Create a stop signal that will be shared between threads
     let stop_signal = Arc::new(AtomicBool::new(false));
     let stop_signal_clone = Arc::clone(&stop_signal);
 
-    // Set up the Ctrl+C handler before any other operations
     ctrlc::set_handler(move || {
         stop_signal_clone.store(true, Ordering::SeqCst);
     })
@@ -41,43 +42,32 @@ pub fn run_app() {
         "files".green()
     );
 
-    // Process files
     println!("\n{}", "📊 Organizing files...".bright_cyan());
-    println!("Press Ctrl+C to stop the process");
+    println!("Press 'q' to quit or Ctrl+C to stop the process");
 
-    let (multi, total_progress, file_progress) = create_progress_bars();
     let total_files = files.len() as u64;
+    let mut ui = ProgressUI::new(total_files).expect("Failed to create UI");
 
-    let total_progress = multi.add(total_progress);
-    let file_progress = multi.add(file_progress);
+    // Initialize the file queue with all files
+    let file_queue: Vec<(String, u64)> = files
+        .iter()
+        .map(|f| (f.name.clone(), f.meta.len()))
+        .collect();
+    ui.set_file_queue(file_queue);
 
-    if let Some(ref save_state) = save_state {
-        let processed_count = save_state.processed_files.len() as u64;
-        update_total_progress(
-            &total_progress,
-            total_files + processed_count,
-            processed_count,
-        );
-    }
-
-    let (tx, rx) = std::sync::mpsc::channel();
-
-    let result = spawn_processing_thread(
+    let (handle, rx) = spawn_processing_thread(
         files,
         output_path.clone(),
-        total_progress,
-        file_progress,
         Arc::clone(&stop_signal),
         total_files,
-        tx,
     );
 
-    if stop_signal.load(Ordering::SeqCst) {
-        let _ = rx.recv();
-        println!("\n{}", "🛑 Process interrupted!".yellow());
+    if let Err(e) = ui.run(rx) {
+        handle_error(format!("UI error: {}", e), Some(&output_path));
+        return;
     }
 
-    let result = match result.join() {
+    let result = match handle.join() {
         Ok(r) => r,
         Err(_) => {
             handle_error("Thread panicked", Some(&output_path));

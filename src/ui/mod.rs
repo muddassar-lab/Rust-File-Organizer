@@ -1,7 +1,7 @@
 mod dialogs;
 mod output;
-mod progress;
+pub(crate) mod progress;
 
 pub use dialogs::get_output_location;
 pub use output::{cleanup, get_output_choice};
-pub use progress::{create_progress_bars, update_file_progress, update_total_progress};
+pub use progress::{ProgressUI, ProgressUpdate};
