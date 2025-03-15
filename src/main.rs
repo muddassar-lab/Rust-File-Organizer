@@ -6,7 +6,7 @@ use file_organizer::{
     organizer::{get_all_files, organize_files},
     ui::{
         cleanup, create_progress_bars, get_output_choice, get_output_location,
-        set_file_progress_stopping, update_file_progress, update_total_progress,
+        update_file_progress, update_total_progress,
     },
 };
 use std::{
@@ -212,11 +212,14 @@ fn main() {
                 files,
                 &output_path,
                 |file_name, file_size, bytes_copied, current_file| {
-                    if stop_signal.load(Ordering::SeqCst) {
-                        set_file_progress_stopping(&file_progress);
-                    }
                     update_total_progress(&total_progress, total_files, current_file as u64);
-                    update_file_progress(&file_progress, file_name, file_size, bytes_copied);
+                    update_file_progress(
+                        &file_progress,
+                        file_name,
+                        file_size,
+                        bytes_copied,
+                        stop_signal.load(Ordering::SeqCst),
+                    );
                 },
                 Arc::clone(&stop_signal),
             );

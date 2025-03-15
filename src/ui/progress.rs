@@ -32,7 +32,7 @@ pub fn create_progress_bars() -> (MultiProgress, ProgressBar, ProgressBar) {
 
     file_progress.set_style(
         ProgressStyle::default_bar()
-            .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec}, {eta} remaining)\n🗂️  {prefix:.green}\n💾 {msg}\n{wide_msg}")
+            .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec}, {eta} remaining)\n🗂️  {prefix:.green}\n💾 {msg}")  // Removed {wide_msg}
             .unwrap()
             .progress_chars("█▇▆▅▄▃▂▁  "),
     );
@@ -53,14 +53,14 @@ pub fn update_file_progress(
     file_name: &str,
     file_size: u64,
     bytes_copied: u64,
+    is_stopping: bool,
 ) {
     progress_bar.set_length(file_size);
     progress_bar.set_position(bytes_copied);
     progress_bar.set_prefix(file_name.to_string());
-    progress_bar.set_message(format!("Total size: {}", format_size(file_size)));
-}
-
-pub fn set_file_progress_stopping(progress_bar: &ProgressBar) {
-    progress_bar.set_message("Total size: (stopping...)".to_string());
-    progress_bar.set_message("⏳ Completing current file before stopping...".to_string());
+    if !is_stopping {
+        progress_bar.set_message(format!("Total size: {}", format_size(file_size)));
+    } else {
+        progress_bar.set_message("⏳ Completing current file before stopping...".to_string());
+    }
 }
