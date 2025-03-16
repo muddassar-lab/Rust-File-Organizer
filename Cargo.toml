@@ -32,3 +32,8 @@ pre-release-replacements = [
     { file = "CHANGELOG.md", search = "<!-- next-header -->", replace = "<!-- next-header -->\n\n## [Unreleased] - ReleaseDate", exactly = 1 },
     { file = "CHANGELOG.md", search = "<!-- next-url -->", replace = "<!-- next-url -->\n[unreleased]: https://github.com/USERNAME/REPO/compare/{{tag_name}}...HEAD", exactly = 1 },
 ]
+
+[package.metadata.wix]
+upgrade-guid = "42E4AE6C-46C1-4FDA-8A5B-E8F5BB08B8F3"
+path-guid = "1AE5F5BF-C8D4-4A1C-B6C9-6A5E6F5C7D8E"
+license = true

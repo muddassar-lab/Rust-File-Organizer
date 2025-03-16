@@ -1,0 +1,99 @@
+<?xml version='1.0' encoding='windows-1252'?>
+<!--
+  Copyright (C) 2017 Christopher R. Field.
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+-->
+
+<?if $(var.Platform) = x64 ?>
+    <?define Win64 = "yes" ?>
+    <?define PlatformProgramFilesFolder = "ProgramFiles64Folder" ?>
+<?else ?>
+    <?define Win64 = "no" ?>
+    <?define PlatformProgramFilesFolder = "ProgramFilesFolder" ?>
+<?endif ?>
+
+<Wix xmlns='http://schemas.microsoft.com/wix/2006/wi'>
+    <Product 
+        Id='*'
+        Name='File Organizer'
+        UpgradeCode='42E4AE6C-46C1-4FDA-8A5B-E8F5BB08B8F3'
+        Manufacturer='Your Name'
+        Language='1033'
+        Codepage='1252'
+        Version='$(var.Version)'>
+
+        <Package Id='*'
+            Keywords='Installer'
+            Description='A powerful, cross-platform file organization tool'
+            Manufacturer='Your Name'
+            InstallerVersion='200'
+            Languages='1033'
+            Compressed='yes'
+            InstallScope='perMachine'
+            SummaryCodepage='1252'
+            Platform='$(var.Platform)'/>
+
+        <MajorUpgrade
+            Schedule='afterInstallInitialize'
+            DowngradeErrorMessage='A newer version of [ProductName] is already installed. Setup will now exit.'/>
+
+        <Media Id='1' Cabinet='media1.cab' EmbedCab='yes' DiskPrompt='CD-ROM #1'/>
+        <Property Id='DiskPrompt' Value='File Organizer Installation'/>
+
+        <Directory Id='TARGETDIR' Name='SourceDir'>
+            <Directory Id='$(var.PlatformProgramFilesFolder)'>
+                <Directory Id='APPLICATIONFOLDER' Name='File Organizer'>
+                    <Component Id='MainExecutable' Guid='*' Win64='$(var.Win64)'>
+                        <File
+                            Id='FileOrganizerEXE'
+                            Name='file-organizer.exe'
+                            DiskId='1'
+                            Source='$(var.CargoTargetBinDir)/file-organizer.exe'
+                            KeyPath='yes'>
+                            <Shortcut
+                                Id='StartMenuShortcut'
+                                Directory='ProgramMenuFolder'
+                                Name='File Organizer'
+                                WorkingDirectory='APPLICATIONFOLDER'
+                                Icon='Icon.exe'
+                                IconIndex='0'
+                                Advertise='yes'/>
+                        </File>
+                    </Component>
+                </Directory>
+            </Directory>
+            <Directory Id='ProgramMenuFolder' Name='Programs'/>
+        </Directory>
+
+        <Feature
+            Id='Complete'
+            Title='File Organizer'
+            Description='The complete package.'
+            Display='expand'
+            Level='1'
+            ConfigurableDirectory='APPLICATIONFOLDER'>
+            <ComponentRef Id='MainExecutable'/>
+        </Feature>
+
+        <Icon Id='Icon.exe' SourceFile='$(var.CargoTargetBinDir)/file-organizer.exe'/>
+        <Property Id='ARPPRODUCTICON' Value='Icon.exe'/>
+
+        <UI>
+            <UIRef Id='WixUI_InstallDir'/>
+            <Property Id='WIXUI_INSTALLDIR' Value='APPLICATIONFOLDER'/>
+        </UI>
+
+        <WixVariable Id='WixUILicenseRtf' Value='$(var.ProjectDir)/LICENSE.rtf'/>
+    </Product>
+</Wix>
