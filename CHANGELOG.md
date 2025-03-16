@@ -5,6 +5,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] - ReleaseDate
 
+## [0.3.0] - 2025-03-16
+
 ## [0.2.0] - 2025-03-16
 
 ### Features
@@ -22,5 +24,6 @@ All notable changes to this project will be documented in this file.
 - API documentation for core components
 
 <!-- next-url -->
-[unreleased]: https://github.com/USERNAME/REPO/compare/v0.2.0...HEAD
+[unreleased]: https://github.com/USERNAME/REPO/compare/v0.3.0...HEAD
+[unreleased]: https://github.com/USERNAME/REPO/compare/v0.2.0...v0.3.0
 [unreleased]: https://github.com/USERNAME/REPO/compare/v0.1.0...v0.2.0
