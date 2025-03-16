@@ -15,8 +15,12 @@ jobs:
           toolchain: stable
       - name: Install WiX
         run: |
+          $wixPath = "C:\WixTools"
+          mkdir $wixPath
           curl -LO https://github.com/wixtoolset/wix3/releases/download/wix3112rtm/wix311-binaries.zip
-          7z x wix311-binaries.zip -o"$env:WIX"
+          7z x wix311-binaries.zip -o"$wixPath" -y
+          echo "WIX=$wixPath" >> $env:GITHUB_ENV
+          echo "$wixPath" >> $env:GITHUB_PATH
       - name: Build MSI
         run: |
           cargo install cargo-wix
