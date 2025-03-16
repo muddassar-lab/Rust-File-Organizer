@@ -13,20 +13,44 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
-      - name: Install WiX
+      - name: Build Release
+        run: cargo build --release
+
+      # Add icon and version info to exe
+      - name: Download Rcedit
         run: |
-          $wixPath = "C:\WixTools"
-          mkdir $wixPath
-          curl -LO https://github.com/wixtoolset/wix3/releases/download/wix3112rtm/wix311-binaries.zip
-          7z x wix311-binaries.zip -o"$wixPath" -y
-          echo "WIX=$wixPath" >> $env:GITHUB_ENV
-          echo "$wixPath" >> $env:GITHUB_PATH
-      - name: Build MSI
+          Invoke-WebRequest -Uri "https://github.com/electron/rcedit/releases/download/v1.1.1/rcedit-x64.exe" -OutFile "rcedit.exe"
+
+      - name: Add Metadata
         run: |
-          cargo install cargo-wix
-          cargo wix
-      - name: Upload MSI
+          .\rcedit.exe "target\release\file-organizer.exe" `
+            --set-icon "assets\icon.ico" `
+            --set-version-string "FileDescription" "File Organizer" `
+            --set-version-string "ProductName" "File Organizer" `
+            --set-file-version "0.7.1" `
+            --set-product-version "0.7.1"
+
+      # Install and run Inno Setup
+      - name: Download Inno Setup
+        run: |
+          Invoke-WebRequest -Uri "https://files.jrsoftware.org/is/6/innosetup-6.2.2.exe" -OutFile "innosetup.exe"
+          .\innosetup.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-
+
+      - name: Create Installer
+        run: |
+          & 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe' installer.iss
+
+      # Upload both portable ZIP and installer
+      - name: Create ZIP (Portable)
+        run: |
+          cd target/release
+          7z a ../../file-organizer-portable.zip file-organizer.exe
+          cd ../..
+
+      - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: windows-msi
-          path: target/wix/*.msi
+          name: windows-releases
+          path: |
+            installer/file-organizer-setup.exe
+            file-organizer-portable.zip
