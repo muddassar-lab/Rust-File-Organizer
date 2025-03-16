@@ -111,8 +111,7 @@ impl ProgressUI {
                         [
                             Constraint::Length(3), // Total progress
                             Constraint::Length(3), // File progress
-                            Constraint::Length(5), // Stats - increased from 3 to 5
-                            Constraint::Min(6),    // Recent files
+                            Constraint::Min(6),    // Files and Stats section
                         ]
                         .as_ref(),
                     )
@@ -120,8 +119,7 @@ impl ProgressUI {
 
                 Self::render_total_progress(ui_state, f, chunks[0]);
                 Self::render_file_progress(ui_state, f, chunks[1]);
-                Self::render_stats(ui_state, f, chunks[2]);
-                Self::render_recent_files(ui_state, f, chunks[3]);
+                Self::render_recent_files(ui_state, f, chunks[2]);
             })?;
 
             if event::poll(Duration::from_millis(100))? {
@@ -260,83 +258,17 @@ impl ProgressUI {
         f.render_widget(gauge, area);
     }
 
-    fn render_stats(state: &ProgressState, f: &mut Frame, area: Rect) {
-        let elapsed = state.start_time.elapsed();
-        let elapsed_secs = elapsed.as_secs_f64();
-
-        // Calculate various statistics
-        let files_per_second = if elapsed_secs > 0.0 {
-            state.current_file_index as f64 / elapsed_secs
-        } else {
-            0.0
-        };
-
-        let avg_file_size = if state.current_file_index > 0 {
-            state.total_bytes as f64 / state.current_file_index as f64
-        } else {
-            0.0
-        };
-
-        let peak_speed = state.bytes_per_second.max(0.0);
-        let current_speed = state.bytes_per_second;
-
-        let stats = Paragraph::new(vec![
-            // First row: Speed metrics
-            Line::from(vec![
-                Span::styled("Current Speed: ", Style::default().fg(Color::Yellow)),
-                Span::raw(format!("{}/s", format_size(current_speed as u64))),
-                Span::raw(" | "),
-                Span::styled("Peak Speed: ", Style::default().fg(Color::Yellow)),
-                Span::raw(format!("{}/s", format_size(peak_speed as u64))),
-            ]),
-            // Second row: Time information
-            Line::from(vec![
-                Span::styled("Elapsed: ", Style::default().fg(Color::Yellow)),
-                Span::raw(format!(
-                    "{}:{:02}:{:02}",
-                    elapsed.as_secs() / 3600,
-                    (elapsed.as_secs() % 3600) / 60,
-                    elapsed.as_secs() % 60
-                )),
-                Span::raw(" | "),
-                Span::styled("ETA: ", Style::default().fg(Color::Yellow)),
-                Span::raw(match state.estimated_time {
-                    Some(eta) => format!(
-                        "{}:{:02}:{:02}",
-                        (eta as u64) / 3600,
-                        ((eta as u64) % 3600) / 60,
-                        (eta as u64) % 60
-                    ),
-                    None => "calculating...".to_string(),
-                }),
-            ]),
-            // Third row: File metrics
-            Line::from(vec![
-                Span::styled("Files/sec: ", Style::default().fg(Color::Yellow)),
-                Span::raw(format!("{:.2}", files_per_second)),
-                Span::raw(" | "),
-                Span::styled("Avg File Size: ", Style::default().fg(Color::Yellow)),
-                Span::raw(format_size(avg_file_size as u64)),
-            ]),
-        ])
-        .block(
-            Block::default()
-                .title(Span::styled(
-                    "Statistics",
-                    Style::default()
-                        .fg(Color::Cyan)
-                        .add_modifier(Modifier::BOLD),
-                ))
-                .borders(Borders::ALL),
-        );
-
-        f.render_widget(stats, area);
-    }
-
     fn render_recent_files(state: &ProgressState, f: &mut Frame, area: Rect) {
         let chunks = Layout::default()
             .direction(Direction::Horizontal)
-            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
+            .constraints(
+                [
+                    Constraint::Percentage(40), // Current & Upcoming
+                    Constraint::Percentage(30), // Completed
+                    Constraint::Percentage(30), // Stats
+                ]
+                .as_ref(),
+            )
             .split(area);
 
         // Left section: Current and upcoming files
@@ -376,9 +308,8 @@ impl ProgressUI {
             for (filename, size) in state
                 .file_queue
                 .iter()
-                .skip(start_idx + 1) // Skip current file
+                .skip(start_idx + 1)
                 .take(files_that_fit)
-            // Take only what fits
             {
                 current_items.push(ListItem::new(Line::from(vec![
                     Span::styled("• ", Style::default().fg(Color::DarkGray)),
@@ -412,11 +343,10 @@ impl ProgressUI {
             )
             .highlight_style(Style::default().add_modifier(Modifier::BOLD));
 
-        // Right section: Completed files
+        // Middle section: Completed files
         let mut completed_items: Vec<ListItem> = Vec::new();
-        let completed_height = area.height as usize - 3; // Account for borders and title
+        let completed_height = area.height as usize - 3;
 
-        // Add completed files that fit in the space
         for file in state.recent_files.iter().rev().take(completed_height) {
             completed_items.push(ListItem::new(Line::from(vec![
                 Span::styled("✓ ", Style::default().fg(Color::Green)),
@@ -425,7 +355,6 @@ impl ProgressUI {
             ])));
         }
 
-        // If no completed files, show a message
         if completed_items.is_empty() {
             completed_items.push(ListItem::new(Line::from(vec![Span::styled(
                 "No files completed yet...",
@@ -446,9 +375,79 @@ impl ProgressUI {
             )
             .highlight_style(Style::default().add_modifier(Modifier::BOLD));
 
-        // Render both sections
+        // Right section: Stats
+        let elapsed = state.start_time.elapsed();
+        let elapsed_secs = elapsed.as_secs_f64();
+
+        let files_per_second = if elapsed_secs > 0.0 {
+            state.current_file_index as f64 / elapsed_secs
+        } else {
+            0.0
+        };
+
+        let avg_file_size = if state.current_file_index > 0 {
+            state.total_bytes as f64 / state.current_file_index as f64
+        } else {
+            0.0
+        };
+
+        let peak_speed = state.bytes_per_second.max(0.0);
+        let current_speed = state.bytes_per_second;
+
+        let stats = Paragraph::new(vec![
+            Line::from(vec![
+                Span::styled("Current Speed: ", Style::default().fg(Color::Yellow)),
+                Span::raw(format!("{}/s", format_size(current_speed as u64))),
+            ]),
+            Line::from(vec![
+                Span::styled("Peak Speed: ", Style::default().fg(Color::Yellow)),
+                Span::raw(format!("{}/s", format_size(peak_speed as u64))),
+            ]),
+            Line::from(vec![
+                Span::styled("Elapsed: ", Style::default().fg(Color::Yellow)),
+                Span::raw(format!(
+                    "{}:{:02}:{:02}",
+                    elapsed.as_secs() / 3600,
+                    (elapsed.as_secs() % 3600) / 60,
+                    elapsed.as_secs() % 60
+                )),
+            ]),
+            Line::from(vec![
+                Span::styled("ETA: ", Style::default().fg(Color::Yellow)),
+                Span::raw(match state.estimated_time {
+                    Some(eta) => format!(
+                        "{}:{:02}:{:02}",
+                        (eta as u64) / 3600,
+                        ((eta as u64) % 3600) / 60,
+                        (eta as u64) % 60
+                    ),
+                    None => "calculating...".to_string(),
+                }),
+            ]),
+            Line::from(vec![
+                Span::styled("Files/sec: ", Style::default().fg(Color::Yellow)),
+                Span::raw(format!("{:.2}", files_per_second)),
+            ]),
+            Line::from(vec![
+                Span::styled("Avg File Size: ", Style::default().fg(Color::Yellow)),
+                Span::raw(format_size(avg_file_size as u64)),
+            ]),
+        ])
+        .block(
+            Block::default()
+                .title(Span::styled(
+                    "Statistics",
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                ))
+                .borders(Borders::ALL),
+        );
+
+        // Render all sections
         f.render_widget(current_list, chunks[0]);
         f.render_widget(completed_list, chunks[1]);
+        f.render_widget(stats, chunks[2]);
     }
 }
 
