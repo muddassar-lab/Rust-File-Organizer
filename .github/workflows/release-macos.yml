@@ -1,0 +1,24 @@
+name: Release macOS Build
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - name: Build DMG
+        run: |
+          cargo install cargo-bundle
+          cargo bundle --release
+      - name: Upload DMG
+        uses: actions/upload-artifact@v2
+        with:
+          name: macos-dmg
+          path: target/release/bundle/osx/*.app

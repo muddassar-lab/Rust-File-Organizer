@@ -1,0 +1,28 @@
+name: Release Windows Build
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - name: Install WiX
+        run: |
+          curl -LO https://github.com/wixtoolset/wix3/releases/download/wix3112rtm/wix311-binaries.zip
+          7z x wix311-binaries.zip -o"$env:WIX"
+      - name: Build MSI
+        run: |
+          cargo install cargo-wix
+          cargo wix
+      - name: Upload MSI
+        uses: actions/upload-artifact@v2
+        with:
+          name: windows-msi
+          path: target/wix/*.msi

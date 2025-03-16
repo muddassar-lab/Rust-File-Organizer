@@ -1,0 +1,24 @@
+name: Release Linux Build
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - name: Build DEB
+        run: |
+          cargo install cargo-deb
+          cargo deb
+      - name: Upload DEB
+        uses: actions/upload-artifact@v2
+        with:
+          name: linux-deb
+          path: target/debian/*.deb
