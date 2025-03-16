@@ -1,7 +1,7 @@
 use crate::{
     OrganizeError,
     models::CustomFile,
-    organizer::organize_files,
+    organizer::{copy_files, organize_files},
     ui::progress::{ProgressUI, ProgressUpdate},
 };
 use std::sync::{
@@ -26,22 +26,23 @@ pub fn spawn_processing_thread(
         let output_path = output_path.clone();
         let stop_signal = Arc::clone(&stop_signal);
         move || {
+            // First, organize files in parallel
+            let organized_files = organize_files(files, &output_path)?;
+
             let last_update = Arc::new(std::sync::Mutex::new((Instant::now(), 0u64)));
 
-            let result = organize_files(
-                files,
-                &output_path,
+            // Then copy files sequentially with progress tracking
+            copy_files(
+                organized_files,
                 |file_name, file_size, bytes_copied, current_file| {
                     let mut last = last_update.lock().unwrap();
                     let now = Instant::now();
                     let elapsed = now.duration_since(last.0);
 
                     if elapsed.as_millis() >= 50 {
-                        // Calculate bytes processed since last update, handling potential overflow
                         let bytes_since_last = if bytes_copied >= last.1 {
                             bytes_copied - last.1
                         } else {
-                            // If we're processing a new file, just use the current bytes_copied
                             bytes_copied
                         };
 
@@ -65,16 +66,12 @@ pub fn spawn_processing_thread(
                             },
                         });
 
-                        // Update last values
                         last.0 = now;
                         last.1 = bytes_copied;
                     }
                 },
                 Arc::clone(&stop_signal),
-            );
-
-            let _ = tx.send(ProgressUpdate::Complete);
-            result
+            )
         }
     });
 

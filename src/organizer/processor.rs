@@ -1,16 +1,46 @@
 use crate::error::OrganizeError;
-use crate::models::{CustomFile, SaveState};
+use crate::models::{CustomFile, OrganizedFile, SaveState};
+use rayon::prelude::*;
 use std::fs::{self, File};
-use std::io::{self, Read, Write};
+use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 const BUFFER_SIZE: usize = 8192;
 
-pub fn organize_files<F>(
+pub fn organize_files(
     files: Vec<CustomFile>,
     output_path: &PathBuf,
+) -> Result<Vec<OrganizedFile>, OrganizeError> {
+    files
+        .par_iter() // Using rayon for parallel processing
+        .map(|file| {
+            let file_type = file.get_type();
+            let date = file
+                .get_creation_date()
+                .map_err(|e| OrganizeError::UserInputError(e))?;
+
+            let type_dir = output_path.join(format!("{:?}", file_type));
+            let date_dir = type_dir.join(date);
+
+            fs::create_dir_all(&date_dir)
+                .map_err(|e| OrganizeError::DirectoryCreationFailed(e.to_string()))?;
+
+            let target_path = date_dir.join(&file.name);
+
+            Ok(OrganizedFile {
+                source_path: file.path.clone(),
+                target_path,
+                file_name: file.name.clone(),
+                size: file.meta.len(),
+            })
+        })
+        .collect()
+}
+
+pub fn copy_files<F>(
+    organized_files: Vec<OrganizedFile>,
     mut progress_callback: F,
     stop_signal: Arc<AtomicBool>,
 ) -> Result<Option<SaveState>, OrganizeError>
@@ -18,54 +48,53 @@ where
     F: FnMut(&str, u64, u64, usize),
 {
     let mut save_state = SaveState::new(
-        files
+        organized_files
             .first()
-            .map(|f| f.path.parent().unwrap_or(&f.path).to_path_buf())
+            .map(|f| {
+                f.source_path
+                    .parent()
+                    .unwrap_or(&f.source_path)
+                    .to_path_buf()
+            })
             .unwrap_or_default(),
-        output_path.clone(),
+        organized_files
+            .first()
+            .map(|f| {
+                f.target_path
+                    .parent()
+                    .unwrap_or(&f.target_path)
+                    .to_path_buf()
+            })
+            .unwrap_or_default(),
     );
 
-    for (index, file) in files.into_iter().enumerate() {
+    for (index, file) in organized_files.into_iter().enumerate() {
         if stop_signal.load(Ordering::SeqCst) && index > 0 {
             return Ok(Some(save_state));
         }
 
-        let file_size = file.meta.len();
-        let mut processed = 0;
-
-        let file_type = file.get_type();
-        let date = file
-            .get_creation_date()
-            .map_err(|e| OrganizeError::UserInputError(e))?;
-
-        let type_dir = output_path.join(format!("{:?}", file_type));
-        let date_dir = type_dir.join(date);
-
-        fs::create_dir_all(&date_dir)
-            .map_err(|e| OrganizeError::DirectoryCreationFailed(e.to_string()))?;
-
-        let target_path = date_dir.join(&file.name);
-
         // Copy file with progress
         copy_file_with_progress(
-            &file.path,
-            &target_path,
-            &file.name,
-            file.meta.len(),
+            &file.source_path,
+            &file.target_path,
+            &file.file_name,
+            file.size,
             |bytes_copied| {
-                progress_callback(&file.name, file.meta.len(), bytes_copied, index + 1);
+                progress_callback(&file.file_name, file.size, bytes_copied, index + 1);
             },
         )?;
 
-        // Call progress callback with final state (100% complete)
-        progress_callback(&file.name, file_size, file_size, index);
+        // Call progress callback with final state
+        progress_callback(&file.file_name, file.size, file.size, index);
+        let source_path = file.source_path.clone();
 
         // Add to save state
         save_state.add_processed_file(
-            file.path,
-            file.name,
-            file_size,
-            file.meta
+            file.source_path,
+            file.file_name,
+            file.size,
+            std::fs::metadata(source_path)
+                .map_err(|e| OrganizeError::FileCopyFailed(e.to_string()))?
                 .modified()
                 .unwrap_or_else(|_| std::time::SystemTime::now()),
         );
