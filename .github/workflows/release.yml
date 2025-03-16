@@ -76,7 +76,8 @@ jobs:
       - name: Build DMG
         run: |
           cargo install cargo-bundle
-          cargo bundle --release      - name: Upload DMG
+          cargo bundle --release
+      - name: Upload DMG
         uses: actions/upload-artifact@v2
         with:
           name: macos-dmg
