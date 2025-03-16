@@ -2,7 +2,7 @@ use std::fs;
 use std::path::PathBuf;
 
 pub fn get_save_dir() -> PathBuf {
-    let mut app_data = dirs::data_local_dir()
+    let app_data = dirs::data_local_dir()
         .unwrap_or_else(|| PathBuf::from("."))
         .join("file-organizer");
 

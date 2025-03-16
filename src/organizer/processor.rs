@@ -106,7 +106,7 @@ where
 fn copy_file_with_progress<F>(
     source: &PathBuf,
     target: &PathBuf,
-    file_name: &str,
+    _file_name: &str,
     file_size: u64,
     mut progress_callback: F,
 ) -> Result<(), OrganizeError>

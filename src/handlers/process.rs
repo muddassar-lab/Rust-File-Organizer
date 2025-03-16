@@ -2,20 +2,16 @@ use crate::{
     OrganizeError,
     models::CustomFile,
     organizer::{copy_files, organize_files},
-    ui::progress::{ProgressUI, ProgressUpdate},
+    ui::progress::ProgressUpdate,
 };
-use std::sync::{
-    Arc,
-    atomic::{AtomicBool, Ordering},
-    mpsc,
-};
+use std::sync::{Arc, atomic::AtomicBool, mpsc};
 use std::time::Instant;
 
 pub fn spawn_processing_thread(
     files: Vec<CustomFile>,
     output_path: std::path::PathBuf,
     stop_signal: Arc<AtomicBool>,
-    total_files: u64,
+    _total_files: u64,
 ) -> (
     std::thread::JoinHandle<Result<Option<crate::models::SaveState>, OrganizeError>>,
     mpsc::Receiver<ProgressUpdate>,

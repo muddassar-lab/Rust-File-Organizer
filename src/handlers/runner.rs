@@ -21,11 +21,11 @@ pub fn run_app() {
     .expect("Error setting Ctrl+C handler");
 
     let InitResult {
-        input_path,
+        input_path: _,
         output_path,
         files,
         resume_path,
-        save_state,
+        save_state: _,
     } = initialize_app(select_operation_mode());
 
     if files.is_empty() {

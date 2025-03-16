@@ -1,6 +1,4 @@
 use colored::*;
-use dialoguer::{Select, theme::ColorfulTheme};
-use std::path::PathBuf;
 
 mod operation;
 pub use operation::select_operation_mode;
